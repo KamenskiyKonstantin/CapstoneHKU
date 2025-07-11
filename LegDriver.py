@@ -1,4 +1,5 @@
 import math
+from MotorDriver import MotorDriver
 
 class RobotArm2D:
     def __init__(self, shoulder_motor, armpit_motor, l1, l2):
@@ -55,3 +56,6 @@ class RobotArm2D:
         self.armpit.move(pulse2)
 
         print(f"Moved to (user coords): x={user_x}, y={user_y}")
+
+
+arm = RobotArm2D(MotorDriver(7, port="cu."), MotorDriver(8, port="cu."), 9, 15)

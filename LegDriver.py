@@ -1,5 +1,6 @@
 import math
-from MotorDriver import MotorDriver
+#from MotorDriver import MotorDriver
+from matplotlib import pyplot as plt
 
 class RobotArm2D:
     def __init__(self, shoulder_motor, armpit_motor, l1, l2):
@@ -12,50 +13,79 @@ class RobotArm2D:
         self.l1 = l1
         self.l2 = l2
 
-    def angle_to_pulse(self, angle_deg, reverse=False):
-        """Convert angle (0–180°) to servo pulse (500–2500)."""
-        pulse = 500 + (angle_deg / 180.0) * 2000
-        return int(3000 - pulse) if reverse else int(pulse)
+    def angle_to_pulse(angle_deg):
+        """
+        Maps an angle in degrees (-90 to 90) to a PWM signal in microseconds (500 to 2500).
+        """
+        # Clamp angle just in case
+        angle_deg = max(-90, min(90, angle_deg))
 
-    def move_to(self, user_x, user_y):
+        # Map from [-90, 90] to [500, 2500]
+        pwm = 500 + ((angle_deg + 90) / 180) * 2000
+        return int(pwm)
+
+    def move_to(self, x, y):
         """
         Moves the end effector to a position in inverse quadrant
         where x increases leftward and y increases downward from the shoulder.
         """
-        if user_x < 0 or user_y < 0:
-            raise ValueError("Inputs must be positive in inverse coordinate space")
 
-        x = -user_x
-        y = -user_y
-
-        r_squared = x**2 + y**2
+        r_squared = x ** 2 + y ** 2
         r = math.sqrt(r_squared)
 
-        # Check reachability
-        if r > self.l1 + self.l2 or r < abs(self.l1 - self.l2):
-            raise ValueError("Target out of reach")
+        cos_alpha = (r_squared - self.l1 ** 2 - self.l2 ** 2) / (- 2 * self.l1 * self.l2)
 
-        # Inverse kinematics
-        cos_theta2 = (r_squared - self.l1**2 - self.l2**2) / (2 * self.l1 * self.l2)
-        theta2 = math.acos(cos_theta2)
+        alpha_rad = math.acos(cos_alpha)
 
-        k1 = self.l1 + self.l2 * math.cos(theta2)
-        k2 = self.l2 * math.sin(theta2)
-        theta1 = math.atan2(y, x) - math.atan2(k2, k1)
+        sin_beta = (self.l2 * math.sin(alpha_rad)) / r
 
-        # Convert to degrees
-        theta1_deg = math.degrees(theta1)
-        theta2_deg = math.degrees(theta2)
+        if not -1 <= sin_beta <= 1:
+            return "impossible"
 
-        # Map to servo pulses
-        pulse1 = self.angle_to_pulse(theta1_deg, reverse=True)   # shoulder reversed
-        pulse2 = self.angle_to_pulse(theta2_deg, reverse=False)  # armpit normal
+        beta_rad = math.asin(sin_beta)
 
-        # Send to motors
-        self.shoulder.move(pulse1)
-        self.armpit.move(pulse2)
-
-        print(f"Moved to (user coords): x={user_x}, y={user_y}")
+        alpha = math.degrees(alpha_rad)
+        beta = math.degrees(beta_rad)
+        beta_alt = -beta
+        gamma = math.degrees(math.atan2(y, x))
 
 
-arm = RobotArm2D(MotorDriver(7, port="cu."), MotorDriver(8, port="cu."), 9, 15)
+        print(f"alpha (degrees): {alpha}")
+        print(f"beta (degrees): {beta}")
+        print(f"gamma (degrees): {gamma}")
+
+        # Your logic here is now good
+        theta_1 = (beta-gamma)-90
+        theta_1_alt = (beta_alt-gamma)-90
+        theta_2 = alpha - 180
+
+        theta_2_alt = - theta_2
+
+        # Normalize
+        # theta_1 = (theta_1+360) % 360
+        # theta_2 = (theta_2+360) % 360
+
+        print(f"theta_1 (degrees): {theta_1}")
+        print(f"theta_2 (degrees): {theta_2}")
+
+        # print alternative angles
+        print(f"theta_1_alt (degrees): {theta_1_alt}")
+        print(f"theta_2_alt (degrees): {theta_2_alt}")
+
+        # motors launch
+        if self.shoulder:
+            self.shoulder.move(self.angle_to_pulse(theta_1), speed=1000, delay=800)
+        if self.armpit:
+            self.armpit.move(self.angle_to_pulse(theta_2), speed=1000, delay=800)
+
+
+
+
+
+
+
+
+
+
+arm = RobotArm2D(None, None, 3, 5)
+arm.move_to(-3, -6)
